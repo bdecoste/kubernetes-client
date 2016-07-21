@@ -15,6 +15,7 @@
  */
 package io.fabric8.kubernetes.client.dsl.internal;
 
+import com.squareup.okhttp.Interceptor;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
@@ -42,6 +43,7 @@ import io.fabric8.kubernetes.client.dsl.TtyExecable;
 import io.fabric8.kubernetes.client.dsl.base.HasMetadataOperation;
 import io.fabric8.kubernetes.client.utils.URLUtils;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
@@ -217,6 +219,18 @@ public class PodOperationsImpl extends HasMetadataOperation<Pod, PodList, Doneab
             Request.Builder r = new Request.Builder().url(url).get();
             OkHttpClient clone = client.clone();
             clone.setReadTimeout(0, TimeUnit.MILLISECONDS);
+
+            if (this.config.getOauthToken() != null){
+            	clone.interceptors().clear();
+            	clone.interceptors().add(new Interceptor() {
+                    @Override
+                    public Response intercept(Chain chain) throws IOException {
+                        Request authReq = chain.request().newBuilder().addHeader("Authorization", "Bearer " + config.getOauthToken()).build();
+                        return chain.proceed(authReq);
+                    }
+                });
+            }
+
             WebSocketCall webSocketCall = WebSocketCall.create(clone, r.build());
             final ExecWebSocketListener execWebSocketListener = new ExecWebSocketListener(in, out, err, inPipe, outPipe, errPipe, execListener);
             webSocketCall.enqueue(execWebSocketListener);
